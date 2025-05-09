@@ -1,0 +1,9 @@
+torch torchvision torchaudio
+torch-scatter --no-cache-dir
+torch-sparse --no-cache-dir
+torch-spline-conv --no-cache-dir
+torch-cluster --no-cache-dir
+torch-geometric --no-cache-dir
+ogb
+transformers
+accelerate
