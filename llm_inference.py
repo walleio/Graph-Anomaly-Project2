@@ -11,7 +11,7 @@ import os
 import torch
 
 cs_categories_short = transform_dict(original_dict=cs_categories)
-def gen_arxiv_message(context, version='zero-shot', example_input=None, example_output=None):
+def gen_arxiv_message_original(context, version='zero-shot', example_input=None, example_output=None):
     sys_prompt = f"You are an AI trained to categorize arXiv computer science papers into specific categories based on their abstracts. Your task is to analyze the paper description provided and identify the most relevant category."
     user_prompt = f"Paper description: {context.strip()}\nGive me the category of this content. Respond only with the category key (e.g., 'cs.AI', 'cs.SY'), without any additional text or explanation."
     if version == 'zero-shot':
@@ -76,8 +76,8 @@ def gen_amazon_message(context, version='zero-shot', example_input=None, example
     version = 'zero-shot'
     categories_list = ", ".join([f"'{category}'" for category in amazon_mapping.values()])
     context = context[:1200] if len(context) > 1200 else context
-    sys_prompt = f"You are an AI trained to categorize product reviews as either authentic or fraudulent. Your task is to analyze the review provided, consider its characteristics, and identify the most relevant category. There are only two categories: {categories_list}"
-    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this review. Respond only with the category key (e.g., 'Authentic', 'Fraudulent'), without any additional text or explanation."
+    sys_prompt = f"You are an AI trained to categorize product reviews as either authentic or fraudulent. Your task is to analyze the review provided, consider its characteristics, and identify the most relevant category. Here are all of the categories: {categories_list}"
+    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this review. Respond only with the category key (this is EITHER 'Authentic', 'Fraudulent'), without any additional text or explanation."
     if version == 'zero-shot':
         messages = [{"role": "system", "content": sys_prompt},
                     {"role": "user", "content": user_prompt}]
@@ -92,11 +92,11 @@ def gen_amazon_message(context, version='zero-shot', example_input=None, example
     return messages
 
 def gen_arxiv_message(context, version='zero-shot', example_input=None, example_output=None):
-    # version = 'zero-shot'
+    version = 'zero-shot'
     categories_list = ", ".join([f"'{category}'" for category in amazon_mapping.values()])
     context = context[:1200] if len(context) > 1200 else context
-    sys_prompt = f"You are an AI trained to categorize papers as either authentic or fraudulent, that is there is one type of paper considered fraudulent, and you are identifying that type. Your task is to analyze the paper information provided, consider its characteristics, and identify the most relevant category. There are only two categories: {categories_list}"
-    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this paper. Respond only with the category key (e.g., 'Authentic', 'Fraudulent'), without any additional text or explanation."
+    sys_prompt = f"You are an AI trained to categorize papers as either belonging to the category General Literature within the field of Computer Science or any other field, that is there is one type of paper considered fraudulent (General Literature), and you are identifying that type. All other types are considered authentic. Your task is to analyze the paper information provided, consider its characteristics, and identify the most relevant category. Here are the categories: {cs_categories}"
+    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this paper. Respond only with the category key (choose between, 'Authentic', 'Fraudulent'), without any additional text or explanation."
     if version == 'zero-shot':
         messages = [{"role": "system", "content": sys_prompt},
                     {"role": "user", "content": user_prompt}]
@@ -240,8 +240,9 @@ if __name__ == "__main__":
                 ]
 
                 category_number = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                print(category_number)
             result_dict[key] = {"label": label, "pred": category_number}
-            if (categories[label][0] == category_number) or (categories[label][0] in category_number):
+            if (categories[label] == category_number):
                 count += 1
         result_dict['acc'] = count / (len(map_dict.keys()) - wrong_case_num)
         return result_dict

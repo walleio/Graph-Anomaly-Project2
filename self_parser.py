@@ -5,7 +5,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--run', type=int, default=1000)
 parser.add_argument('--stru', type=str, default='sage')
 parser.add_argument('--epoch_times', type=int, default=5)
-# .1 for amazon
+# .1 for amazon, .01 for arxiv_2023
 parser.add_argument('--ratio', type=float, default=.01)
 parser.add_argument('--dataset', type=str, default='amazon')
 parser.add_argument('--ak', type=int, default=0)

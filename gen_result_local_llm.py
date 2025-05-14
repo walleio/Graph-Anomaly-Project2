@@ -37,8 +37,8 @@ cs_categories_short = transform_dict(original_dict=cs_categories)
 
 
 def gen_arxiv_message(context,  example_input=None, example_output=None):
-    sys_prompt = f"You are an AI trained to categorize arXiv computer science papers into specific categories based on their abstracts. Your task is to analyze the paper description provided and identify the most relevant category."
-    user_prompt = f"Paper description: {context.strip()}\nGive me the category of this content. Respond only with the category key (e.g., 'cs.AI', 'cs.SY'), without any additional text or explanation."
+    sys_prompt = f"You are an AI trained to categorize papers as either belonging to the category General Literature within the field of Computer Science or any other field, that is there is one type of paper considered fraudulent (General Literature), and you are identifying that type. All other types are considered authentic. Your task is to analyze the paper information provided, consider its characteristics, and identify the most relevant category. Here are the categories: {cs_categories}"
+    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this paper. Respond only with the category key (e.g., 'Authentic', 'Fraudulent'), without any additional text or explanation."
 
     icl_str = f"This is an example: " \
               f"\nExample 1: \nInput: {example_input[0]}\nOutput: {example_output[0]}"
@@ -78,7 +78,7 @@ def gen_amazon_message(context, example_input=None, example_output=None):
     
     return message
     
-def create_chat_message(context, version='zero-shot', example_input=None, example_output=None,
+def create_chat_message(context, example_input=None, example_output=None,
                         dataset_name='ogbn-arxiv', llm_model='gpt35'):
     if dataset_name in ['ogbn-arxiv', 'arxiv_2023']:
         messages = gen_arxiv_message(context=context,
@@ -218,11 +218,10 @@ def main():
         data = data.to(device)
         split_idx = dataset.get_idx_split()
 
-    #Made by Oscar
     elif dataset_name == 'amazon':
         data = process_data()
         # data.x = data.x[torch.where(data.y) == 2]
-        dataset_num_classes = 3
+        dataset_num_classes = 2
         text_data = (pd.read_csv('~/Graph-Anomaly-Project/data/reviews.csv'))["text"]
         node_transform = T.RandomNodeSplit('train_rest', num_val=.2, num_test=1-.2-ratio)
         data = node_transform(data)
@@ -236,7 +235,6 @@ def main():
         adj_t = SparseTensor(row=row, col=col, sparse_sizes=(num_nodes, num_nodes)).to_symmetric()
         data.adj_t = adj_t
         data.adj_t = data.adj_t.to_symmetric()
-        # data.y = process_tensor(data.y)
 
     elif dataset_name == 'arxiv_2023':
         data, text = get_raw_text_arxiv_2023(use_text=True)
@@ -254,7 +252,6 @@ def main():
         adj_t = SparseTensor(row=row, col=col, sparse_sizes=(num_nodes, num_nodes)).to_symmetric()
         data.adj_t = adj_t
         data.adj_t = data.adj_t.to_symmetric()
-        # data.y = process_tensor(data.y)
         data.y = data.y.squeeze()
 
     if args.llm_model == 'qwen':
@@ -327,7 +324,6 @@ def main():
                             example_input = [raw_data[select_neigh]]
                             example_output = [categories[real_labels[select_neigh].item()][0]]
                             messages_tmp = create_chat_message(context=raw_content,
-                                                               version='zero-shot',
                                                                example_input=example_input,
                                                                example_output=example_output,
                                                                dataset_name=args.dataset_name)
