@@ -3,10 +3,6 @@ import torch
 from sentence_transformers import SentenceTransformer
 import itertools
 from torch_geometric.data import HeteroData, Data
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
-# https://pytorch-geometric.readthedocs.io/en/latest/tutorial/load_csv.html
 
 #### node processing ###
 def load_node_csv(path, index_col, encoders=None, **kwargs):
@@ -42,61 +38,53 @@ class IdentityEncoder:
 def load_edge_csv(path, mapping, encoders=None, device='cuda', **kwargs):
     df = pd.read_csv(path, **kwargs)
 
-    edges = set()
+    edges = []
 
-    # filter to connect nodes with that have reviewed the same product
+    # filter to connect nodes that have reviewed the same product
     grouped = df.groupby('productId')
 
     for productId, group in grouped:
         user_list = group['userId']
 
         for u1, u2 in itertools.combinations(user_list, 2):
-            edges.add(tuple((u1, u2)))    
+            edges.append((u1, u2))    
 
-    # filter to connect nodes that have given the same score
-    grouped = df.groupby('score')
+    # filter to connect nodes that have given the same star rating in the same week
+    grouped = df.groupby('score')  
 
     for score, group in grouped:
         user_list = []
         for x, i in enumerate(group['time']):
-            for y, j in enumerate(group['time'][1:]):
+            for y, j in enumerate(group['time'][x+1:]):
                 if (abs(i - j) < 604800):
-                    edges.add(tuple((group['userId'].iloc[x], group['userId'].iloc[y])))
+                    edges.append((group['userId'].iloc[x], group['userId'].iloc[y+x+1]))
 
-    # filter for tf-idf
-    df_per_user = (
-        df.groupby("userId", sort=False)["text"]
-        .apply(" ".join)
-        .reset_index()
-    )
-
-    vectoriser = TfidfVectorizer(
-        min_df=3,            
-        max_df=0.8,        
-        ngram_range=(1, 2),  
-    )
-
-    tfidf_matrix = vectoriser.fit_transform(df_per_user["text"].values)
-
-    N = tfidf_matrix.shape[0]
-    k = max(1, int(0.05 * (N - 1)))
-
-    S = cosine_similarity(tfidf_matrix, dense_output=True) 
-    user_ids = df_per_user["userId"].to_numpy()
-
-    for u in range(N):
-        top_k = S[u].argsort()[::-1][1 : k + 1]
-        for v in top_k:
-            if u in S[v].argsort()[::-1][1 : k + 1]:
-                edges.add(tuple(sorted((user_ids[u], user_ids[v]))))
+    #TODO: add TF-IDF to the edge attributes
 
     src = []
     dst = []
-    for a,b in edges:
+    for a, b in edges:
         src.append(mapping[a])
         dst.append(mapping[b])
 
-    edge_index = torch.tensor([src, dst])
+    src_filtered = []
+    dst_filtered = []
+    for a, b in zip(src, dst):
+        if a in dst_filtered and src_filtered[dst_filtered.index(a)] == b:
+            continue
+        else:
+            src_filtered.append(a)
+            dst_filtered.append(b)
+
+    src_undirected = []
+    dst_undirected = []
+    for a, b in zip(src_filtered, dst_filtered):
+        src_undirected.append(a)
+        dst_undirected.append(b)
+        src_undirected.append(b)
+        dst_undirected.append(a)
+
+    edge_index = torch.tensor([src_undirected, dst_undirected])
 
     edge_attr = None
     if encoders is not None:
@@ -106,11 +94,10 @@ def load_edge_csv(path, mapping, encoders=None, device='cuda', **kwargs):
     return edge_index, edge_attr
     
 def process_data():
-    x, mapping = load_node_csv('~/Graph-Anomaly-Project/data/users.csv', 'userId', encoders={
+    x, mapping = load_node_csv('~/Graph-Anomaly-Project2/data/users3.csv', 'userId', encoders={
     'profileName': SequenceEncoder()})
 
-
-    edge_index, edge_attrs = load_edge_csv('~/Graph-Anomaly-Project/data/reviews.csv', mapping, encoders={
+    edge_index, edge_attrs = load_edge_csv('~/Graph-Anomaly-Project2/data/reviews3.csv', mapping, encoders={
     'time': IdentityEncoder(),
     'score': IdentityEncoder(),
     'helpfulness numerator': IdentityEncoder(),
@@ -122,8 +109,9 @@ def process_data():
     data = Data()
     data.num_nodes = len(mapping)
     data.x = x
-    labels_df = pd.read_csv('~/Graph-Anomaly-Project/data/users.csv')
-    data.y = torch.tensor(labels_df['label'])
+
+    labels_df = pd.read_csv('~/Graph-Anomaly-Project2/data/users3.csv')
+    data.y = torch.tensor(labels_df["label"])
 
     data.edge_index = edge_index
     data.edge_labels = edge_attrs

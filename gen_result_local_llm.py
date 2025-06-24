@@ -66,17 +66,22 @@ def gen_product_message(context, example_input=None, example_output=None):
 
 # created by Oscar
 def gen_amazon_message(context, example_input=None, example_output=None):
-    sys_prompt = f"You are an AI trained to determine whether or not a review is genuine or not. That is, you are a fake review detector. Your task is to analyze the review provided, consider its characteristics, and make a decision regarding its authenticity."
-    user_prompt = f"Review. Consider its characteristics and provide me with your decision regarding its authenticity (real or fake). Repond only with the category key (choose one of 'Real', 'Fake'), without any additional text or explanation."
+    categories = {0: "Fraudulent",
+                  1: "Authentic"}
 
-    # TODO: add functionality for providing more examples
-    icl_str = f"This is an example: " \
-              f"\nExample 1: \nInput: {example_input[0]}\nOutput: {example_output[0]}"
-    
-    message = [{"role": "system", "content": sys_prompt + f"\n{icl_str}"},
+    sys_prompt = f"You are an AI trained to categorize product reviews as either authentic or fraudulent. Your task is to analyze the review provided, consider its characteristics, and identify the most relevant category. Here are all of the categories: {categories}. You are to ONLY give a one word response, regarding the relevant category."
+    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this review. Respond only with the category key (this is EITHER 'Authentic', 'Fraudulent'), without any additional text or explanation. Do not share your thinking process"
+
+    icl_str = ""
+    if example_input and example_output and len(example_input) == len(example_output):
+        for idx, (inp, out) in enumerate(zip(example_input, example_output)):
+            trimmed_input = inp[:800] if len(inp) > 800 else inp
+            icl_str += f"\nExample {idx + 1}: \nInput: {trimmed_input}\nOutput: {out}\n\n"
+    messages = [{"role": "system",
+                 "content": sys_prompt + f"\nHere are some examples to help you understand how to categorize products based on their descriptions:{icl_str}"},
                 {"role": "user", "content": user_prompt}]
     
-    return message
+    return messages
     
 def create_chat_message(context, example_input=None, example_output=None,
                         dataset_name='ogbn-arxiv', llm_model='gpt35'):
@@ -219,12 +224,14 @@ def main():
         split_idx = dataset.get_idx_split()
 
     elif dataset_name == 'amazon':
+        print('Processing data...')
         data = process_data()
         # data.x = data.x[torch.where(data.y) == 2]
         dataset_num_classes = 2
-        text_data = (pd.read_csv('~/Graph-Anomaly-Project/data/reviews.csv'))["text"]
+        text_data = (pd.read_csv('~/Graph-Anomaly-Project2/data/reviews3.csv'))["text"]
         node_transform = T.RandomNodeSplit('train_rest', num_val=.2, num_test=1-.2-ratio)
         data = node_transform(data)
+        print(data)
         split_idx = {}
         split_idx['train'] = torch.where(data.train_mask)[0]
         split_idx['valid'] = torch.where(data.val_mask)[0]
@@ -256,7 +263,7 @@ def main():
 
     if args.llm_model == 'qwen':
         cache_dir = os.path.join("/", "projects", "p32673", "AskGNN", "hf_cache")
-        cach_path = 'Qwen/Qwen1.5-4B-Chat'
+        cach_path = 'Qwen/Qwen3-8B'
         tokenizer = AutoTokenizer.from_pretrained(cach_path)
         llm_model = AutoModelForCausalLM.from_pretrained(cach_path, cache_dir=cache_dir, torch_dtype="auto", device_map="auto")
     if args.dataset_name == 'ogbn-arxiv':
@@ -296,7 +303,7 @@ def main():
             loss, out = train(model, data, train_idx, optimizer)
             norm_out = out / out.norm(dim=1, keepdim=True)
             cos_sim_matrix = torch.mm(norm_out, norm_out.t())
-            top_k_values, top_k_indices = torch.topk(cos_sim_matrix, k=3, largest=True, dim=-1)
+            top_k_values, top_k_indices = torch.topk(cos_sim_matrix, k=4, largest=True, dim=-1)
             map_dict = tensor_to_dict(A=train_idx, B=top_k_indices.cpu(), train_idx=train_idx)
             map_dict = remove_key_from_values(map_dict)
             if args.dataset_name  == 'arxiv_2023':
@@ -310,7 +317,6 @@ def main():
                 if train_node_idx not in train_icl_dict:
                     train_icl_dict[train_node_idx] = {}
 
-
                 train_node_neigh = map_dict[train_node_idx]
                 train_node_label = categories[real_labels[train_node_idx].item()][0]
                 train_node_neigh_ppl_map_dict = {}
@@ -322,7 +328,7 @@ def main():
                         else:
                             raw_content = raw_data[train_node_idx]
                             example_input = [raw_data[select_neigh]]
-                            example_output = [categories[real_labels[select_neigh].item()][0]]
+                            example_output = [categories[real_labels[select_neigh].item()]]
                             messages_tmp = create_chat_message(context=raw_content,
                                                                example_input=example_input,
                                                                example_output=example_output,
@@ -382,4 +388,5 @@ def main():
             save_dict_as_pickle(dictionary=final_dict, file_path='data/graph_pickle.pkl')
 
 if __name__ == "__main__":
+    print('Starting...')
     main()

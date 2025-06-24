@@ -1,3 +1,8 @@
 data/users.csv
 data/reviews.csv
 data/graph_pickle.pkl
+data/results.pkl
+data/reviews3.csv
+data/users3.csv
+data/reviews2.csv
+data/users2.csv

@@ -73,11 +73,11 @@ def gen_arxiv_message_original(context, version='zero-shot', example_input=None,
     return messages
 
 def gen_amazon_message(context, version='zero-shot', example_input=None, example_output=None):
-    version = 'zero-shot'
+    # version = 'zero-shot'
     categories_list = ", ".join([f"'{category}'" for category in amazon_mapping.values()])
     context = context[:1200] if len(context) > 1200 else context
-    sys_prompt = f"You are an AI trained to categorize product reviews as either authentic or fraudulent. Your task is to analyze the review provided, consider its characteristics, and identify the most relevant category. Here are all of the categories: {categories_list}"
-    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this review. Respond only with the category key (this is EITHER 'Authentic', 'Fraudulent'), without any additional text or explanation."
+    sys_prompt = f"You are an AI trained to categorize product reviews as either authentic or fraudulent. Your task is to analyze the review provided, consider its characteristics, and identify the most relevant category. Here are all of the categories: {categories_list}. You are to ONLY give a one word response, regarding the relevant category."
+    user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this review. Respond only with the category key (this is EITHER 'Authentic', 'Fraudulent'), without any additional text or explanation. Do not share your thinking process"
     if version == 'zero-shot':
         messages = [{"role": "system", "content": sys_prompt},
                     {"role": "user", "content": user_prompt}]
@@ -95,7 +95,7 @@ def gen_arxiv_message(context, version='zero-shot', example_input=None, example_
     version = 'zero-shot'
     categories_list = ", ".join([f"'{category}'" for category in amazon_mapping.values()])
     context = context[:1200] if len(context) > 1200 else context
-    sys_prompt = f"You are an AI trained to categorize papers as either belonging to the category General Literature within the field of Computer Science or any other field, that is there is one type of paper considered fraudulent (General Literature), and you are identifying that type. All other types are considered authentic. Your task is to analyze the paper information provided, consider its characteristics, and identify the most relevant category. Here are the categories: {cs_categories}"
+    sys_prompt = f"You are an AI trained to categorize papers as either belonging to the category 'Authentic' or 'Fraudulent', that is there is one type of paper considered fraudulent, and you are identifying that type. Your task is to analyze the paper information provided, consider its characteristics, and identify the most relevant category."
     user_prompt = f"Review description: {context.strip()}\nConsider its characteristics and give me the category of this paper. Respond only with the category key (choose between, 'Authentic', 'Fraudulent'), without any additional text or explanation."
     if version == 'zero-shot':
         messages = [{"role": "system", "content": sys_prompt},
@@ -161,10 +161,12 @@ def create_chat_message(context, version='zero-shot', example_input=None, exampl
 if __name__ == "__main__":
     device = f'cuda'
     if args.llm_model == 'qwen':
-        cach_path = 'Qwen/Qwen2-7B-Instruct'
+        cach_path = 'Qwen/Qwen3-8B'
+        cache_dir = os.path.join("/", "projects", "p32673", "AskGNN", "hf_cache")
         tokenizer = AutoTokenizer.from_pretrained(cach_path)
         llm_model = AutoModelForCausalLM.from_pretrained(
             cach_path,
+            cache_dir=cache_dir,
             torch_dtype="auto",
             device_map="auto"
         )
@@ -223,6 +225,7 @@ if __name__ == "__main__":
             example_output = [categories[labels[idx].item()] for idx in map_dict[key]]
             messages = create_chat_message(context=raw_content, version='icl', example_input=example_input,
                                            example_output=example_output, dataset_name=args.dataset)
+
             with torch.no_grad():
                 text = tokenizer.apply_chat_template(
                     messages,
@@ -240,8 +243,11 @@ if __name__ == "__main__":
                 ]
 
                 category_number = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                print(category_number)
-            result_dict[key] = {"label": label, "pred": category_number}
+                tail = category_number.rsplit("</think>", 1)[-1]
+                category_number = "Fraudulent" if "fraudulent" in tail.lower() else "Authentic"            
+                if category_number == "Fraudulent":
+                    print(messages)
+                result_dict[key] = {"label": label, "pred": category_number}
             if (categories[label] == category_number):
                 count += 1
         result_dict['acc'] = count / (len(map_dict.keys()) - wrong_case_num)
@@ -252,6 +258,7 @@ if __name__ == "__main__":
         categories = {0: "Fraudulent",
                       1: "Authentic"}
         final_result_dict = get_method_acc(dict['raw_data'], categories, dict['map_dict'], dict['labels'])
+        print(final_result_dict)
         save_dict_as_pickle(dictionary=final_result_dict, file_path='data/results.pkl')
     # final_result_dict[method_name_map[map_dict]] = get_method_acc(raw_data=raw_data,
                                                                 # categories=categories,

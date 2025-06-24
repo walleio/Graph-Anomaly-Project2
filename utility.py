@@ -227,7 +227,8 @@ def tensor_to_dict(A, B, train_idx, k=3):
         result_dict[A_array[i]] = train_idx[B[i]].tolist()
         random_indices = np.random.choice(len(train_idx), k, replace=False)
     # print(result_dict)
-    return result_dict
+    final_result_dict = {key: [i for i in lst if i != key] for key, lst in result_dict.items()}
+    return final_result_dict
 
 
 # download the dataset
