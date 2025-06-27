@@ -58,7 +58,8 @@ with open('/projects/p32673/AmazonData/movies.txt', 'r', errors='ignore') as fil
                             try:
                                 user_ratings.append({'userId': movie['userId'], 
                                                         'helpful ratings': movie['helpfulness numerator'], 
-                                                        'total ratings': movie['helpfulness denominator']})
+                                                        'total ratings': movie['helpfulness denominator'],
+                                                        'review_example': movie['text'][:800]})
                             except:
                                 continue
                         else:
@@ -85,6 +86,7 @@ with open('/projects/p32673/AmazonData/movies.txt', 'r', errors='ignore') as fil
 
                     for i in users:
                         i['label'] = [j['label'] for j in filter(lambda x: x['userId'] == i['userId'], filtered_list)]
+                        i['review_example'] = [j['review_example'] for j in filter(lambda x: x['userId'] == i['userId'], filtered_list)]
 
                     filtered_reviews = []
                     for i in reviews:
@@ -107,13 +109,17 @@ with open('/projects/p32673/AmazonData/movies.txt', 'r', errors='ignore') as fil
                                     writer.writerow(row)
 
                     with open('reviews3.csv', mode, newline='', encoding='utf-8') as csvfile:
-                        fieldnames = filtered_reviews[0].keys()
+                        # Exclude 'summary' and 'text' columns from fieldnames
+                        all_fieldnames = filtered_reviews[0].keys()
+                        fieldnames = [field for field in all_fieldnames if field not in ['summary', 'text']]
                         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                         if mode == 'w':
                             writer.writeheader()
 
                         for row in filtered_reviews:
-                            writer.writerow(row)
+                            # Create a new row without 'summary' and 'text' columns
+                            filtered_row = {k: v for k, v in row.items() if k not in ['summary', 'text']}
+                            writer.writerow(filtered_row)
 
                 print(count)
                 break

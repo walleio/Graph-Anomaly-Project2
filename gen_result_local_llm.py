@@ -228,10 +228,9 @@ def main():
         data = process_data()
         # data.x = data.x[torch.where(data.y) == 2]
         dataset_num_classes = 2
-        text_data = (pd.read_csv('~/Graph-Anomaly-Project2/data/reviews3.csv'))["text"]
-        node_transform = T.RandomNodeSplit('train_rest', num_val=.2, num_test=1-.2-ratio)
+        text_data = (pd.read_csv('~/Graph-Anomaly-Project2/data/users3.csv', nrows=1000))["review_example"]
+        node_transform = T.RandomNodeSplit('train_rest', num_val=.1, num_test=.1)
         data = node_transform(data)
-        print(data)
         split_idx = {}
         split_idx['train'] = torch.where(data.train_mask)[0]
         split_idx['valid'] = torch.where(data.val_mask)[0]
@@ -303,7 +302,7 @@ def main():
             loss, out = train(model, data, train_idx, optimizer)
             norm_out = out / out.norm(dim=1, keepdim=True)
             cos_sim_matrix = torch.mm(norm_out, norm_out.t())
-            top_k_values, top_k_indices = torch.topk(cos_sim_matrix, k=4, largest=True, dim=-1)
+            top_k_values, top_k_indices = torch.topk(cos_sim_matrix, k=11, largest=True, dim=-1)
             map_dict = tensor_to_dict(A=train_idx, B=top_k_indices.cpu(), train_idx=train_idx)
             map_dict = remove_key_from_values(map_dict)
             if args.dataset_name  == 'arxiv_2023':
@@ -374,7 +373,7 @@ def main():
             out_remain_selected = out_remain_selected.to(device2)
             out = out.to(device2)
             cos_sim = cosine_similarity(out_remain_selected.unsqueeze(1), out.unsqueeze(0), dim=-1)
-            top_k_values, top_k_indices = torch.topk(cos_sim, k=3, largest=True, dim=-1)
+            top_k_values, top_k_indices = torch.topk(cos_sim, k=10, largest=True, dim=-1)
             train_idx_2 = train_idx.to(device2)
 
             map_dict = tensor_to_dict(A=selected_samples_from_remain, B=top_k_indices,

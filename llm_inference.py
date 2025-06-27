@@ -8,6 +8,7 @@ import random
 from self_parser import parser, args
 import numpy as np
 import os
+from sklearn.metrics import roc_auc_score
 import torch
 
 cs_categories_short = transform_dict(original_dict=cs_categories)
@@ -174,7 +175,7 @@ if __name__ == "__main__":
     base_model_type = args.llm_model
     api_key_list = []
     save_path_raw = 'your dict save path'
-    file_path = f'data/graph_pickle.pkl'
+    file_path = f'results/Jun27-10_examples-800_train-MODEL.pkl'
     if args.dataset == 'ogbn-arxiv':
         categories = cs_categories
     elif args.dataset == 'ogbn-products':
@@ -258,15 +259,7 @@ if __name__ == "__main__":
         categories = {0: "Fraudulent",
                       1: "Authentic"}
         final_result_dict = get_method_acc(dict['raw_data'], categories, dict['map_dict'], dict['labels'])
-        print(final_result_dict)
-        save_dict_as_pickle(dictionary=final_result_dict, file_path='data/results.pkl')
-    # final_result_dict[method_name_map[map_dict]] = get_method_acc(raw_data=raw_data,
-                                                                # categories=categories,
-                                                                # map_dict=map_dict,
-                                                                # true_labels=labels,
-                                                                # )
-    # save_path = f'result save path'
-    # save_dict_as_pickle(dictionary=final_result_dict, file_path=save_path + 'result.pkl')
+        save_dict_as_pickle(dictionary=final_result_dict, file_path='results/Jun27-10_examples-800_train')
 
 
 

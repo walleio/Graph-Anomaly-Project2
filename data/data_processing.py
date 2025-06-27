@@ -3,10 +3,11 @@ import torch
 from sentence_transformers import SentenceTransformer
 import itertools
 from torch_geometric.data import HeteroData, Data
+from torch_geometric.utils import remove_self_loops
 
 #### node processing ###
 def load_node_csv(path, index_col, encoders=None, **kwargs):
-    df = pd.read_csv(path, index_col=index_col, **kwargs)
+    df = pd.read_csv(path, index_col=index_col, nrows=1000, **kwargs)
     mapping = {index: i for i, index in enumerate(df.index.unique())}
 
     x = None
@@ -36,7 +37,7 @@ class IdentityEncoder:
         return torch.from_numpy(df.values).view(-1, 1).to(self.dtype).to(self.device)
 
 def load_edge_csv(path, mapping, encoders=None, device='cuda', **kwargs):
-    df = pd.read_csv(path, **kwargs)
+    df = pd.read_csv(path, nrows=1000, **kwargs)
 
     edges = []
 
@@ -47,7 +48,7 @@ def load_edge_csv(path, mapping, encoders=None, device='cuda', **kwargs):
         user_list = group['userId']
 
         for u1, u2 in itertools.combinations(user_list, 2):
-            edges.append((u1, u2))    
+            edges.append((u1, u2))
 
     # filter to connect nodes that have given the same star rating in the same week
     grouped = df.groupby('score')  
@@ -86,16 +87,19 @@ def load_edge_csv(path, mapping, encoders=None, device='cuda', **kwargs):
 
     edge_index = torch.tensor([src_undirected, dst_undirected])
 
-    edge_attr = None
+    '''
     if encoders is not None:
         edge_attrs = [encoder(df[col]) for col, encoder in encoders.items()]
         edge_attr = torch.cat(edge_attrs, dim=-1)
+    '''
+    edge_attr = torch.tensor([], device='cuda')
 
     return edge_index, edge_attr
     
 def process_data():
     x, mapping = load_node_csv('~/Graph-Anomaly-Project2/data/users3.csv', 'userId', encoders={
-    'profileName': SequenceEncoder()})
+    'profileName': SequenceEncoder(),
+    'review_example': SequenceEncoder()})
 
     edge_index, edge_attrs = load_edge_csv('~/Graph-Anomaly-Project2/data/reviews3.csv', mapping, encoders={
     'time': IdentityEncoder(),
@@ -110,10 +114,10 @@ def process_data():
     data.num_nodes = len(mapping)
     data.x = x
 
-    labels_df = pd.read_csv('~/Graph-Anomaly-Project2/data/users3.csv')
+    labels_df = pd.read_csv('~/Graph-Anomaly-Project2/data/users3.csv', nrows=1000)
     data.y = torch.tensor(labels_df["label"])
-
+    
+    edge_index, _ = remove_self_loops(edge_index)
     data.edge_index = edge_index
-    data.edge_labels = edge_attrs
 
     return data
