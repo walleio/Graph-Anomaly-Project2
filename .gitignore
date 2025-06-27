@@ -6,3 +6,8 @@ data/reviews3.csv
 data/users3.csv
 data/reviews2.csv
 data/users2.csv
+results/Jun26-0_examples-800_train.pkl
+results/Jun26-3_examples-800_train.pkl
+results/Jun26-3_examples-800_train-MODEL.pkl
+results/Jun27-10_examples-800_train.pkl
+results/Jun26-10_examples-800_train-MODEL.pkl
